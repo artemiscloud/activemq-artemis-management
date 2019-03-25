@@ -10,6 +10,8 @@ type IArtemis interface {
 	Uptime() (*jolokia.ReadData, error)
 	CreateQueue(addressName string, queueName string) (*jolokia.ExecData, error)
 	DeleteQueue(queueName string) (*jolokia.ExecData, error)
+	ListBindingsForAddress(addressName string) (*jolokia.ExecData, error)
+	DeleteAddress(addressName string) (*jolokia.ExecData, error)
 }
 
 type Artemis struct {
@@ -55,6 +57,26 @@ func (artemis *Artemis) DeleteQueue(queueName string) (*jolokia.ExecData, error)
 	url := "org.apache.activemq.artemis:broker=\\\"" + artemis.name + "\\\""
 	parameters := `"` + queueName + `"`
 	jsonStr := `{ "type":"EXEC","mbean":"` + url + `","operation":"destroyQueue(java.lang.String)","arguments":[` + parameters + `]` + ` }`
+	data, err := artemis.jolokia.Exec(url, jsonStr)
+
+	return data, err
+}
+
+func (artemis *Artemis) ListBindingsForAddress(addressName string) (*jolokia.ExecData, error) {
+
+	url := "org.apache.activemq.artemis:broker=\\\"" + artemis.name + "\\\""
+	parameters := `"` +addressName + `"`
+	jsonStr := `{ "type":"EXEC","mbean":"` + url + `","operation":"listBindingsForAddress(java.lang.String)","arguments":[` + parameters + `]` + ` }`
+	data, err := artemis.jolokia.Exec(url, jsonStr)
+
+	return data, err
+}
+
+func (artemis *Artemis) DeleteAddress(addressName string) (*jolokia.ExecData, error) {
+
+	url := "org.apache.activemq.artemis:broker=\\\"" + artemis.name + "\\\""
+	parameters := `"` + addressName + `"`
+	jsonStr := `{ "type":"EXEC","mbean":"` + url + `","operation":"deleteAddress(java.lang.String)","arguments":[` + parameters + `]` + ` }`
 	data, err := artemis.jolokia.Exec(url, jsonStr)
 
 	return data, err
