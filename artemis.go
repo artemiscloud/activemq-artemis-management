@@ -15,19 +15,19 @@ type IArtemis interface {
 }
 
 type Artemis struct {
-	ip 			string
+	ip          string
 	jolokiaPort string
-	name 		string
-	jolokia 	*jolokia.Jolokia
+	name        string
+	jolokia     *jolokia.Jolokia
 }
 
 func NewArtemis(_ip string, _jolokiaPort string, _name string) *Artemis {
 
-	artemis := Artemis {
-		ip: _ip,
+	artemis := Artemis{
+		ip:          _ip,
 		jolokiaPort: _jolokiaPort,
-		name: _name,
-		jolokia: jolokia.NewJolokia(_ip, _jolokiaPort, "/console/jolokia"),
+		name:        _name,
+		jolokia:     jolokia.NewJolokia(_ip, _jolokiaPort, "/console/jolokia"),
 	}
 
 	return &artemis
@@ -65,7 +65,7 @@ func (artemis *Artemis) DeleteQueue(queueName string) (*jolokia.ExecData, error)
 func (artemis *Artemis) ListBindingsForAddress(addressName string) (*jolokia.ExecData, error) {
 
 	url := "org.apache.activemq.artemis:broker=\\\"" + artemis.name + "\\\""
-	parameters := `"` +addressName + `"`
+	parameters := `"` + addressName + `"`
 	jsonStr := `{ "type":"EXEC","mbean":"` + url + `","operation":"listBindingsForAddress(java.lang.String)","arguments":[` + parameters + `]` + ` }`
 	data, err := artemis.jolokia.Exec(url, jsonStr)
 
