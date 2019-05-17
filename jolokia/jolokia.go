@@ -14,30 +14,30 @@ type IData interface {
 }
 
 type ExecRequest struct {
-	MBean 		string 			`json:"mbean"`
-	Arguments 	[]string 		`json:"arguments"`
-	Type 		string 			`json:"type"`
-	Operation 	string 			`json:"operation"`
+	MBean     string   `json:"mbean"`
+	Arguments []string `json:"arguments"`
+	Type      string   `json:"type"`
+	Operation string   `json:"operation"`
 }
 
 type ExecData struct {
-	Request		*ExecRequest	`json:"request"`
-	Value 		string       	`json:"value"`
-	Timestamp 	int        		`json:"timestamp"`
-	Status 		int           	`json:"status"`
+	Request   *ExecRequest `json:"request"`
+	Value     string       `json:"value"`
+	Timestamp int          `json:"timestamp"`
+	Status    int          `json:"status"`
 }
 
 type ReadRequest struct {
-	MBean 		string 			`json:"mbean"`
-	Attribute 	string 			`json:"attribute"`
-	Type 		string 			`json:"type"`
+	MBean     string `json:"mbean"`
+	Attribute string `json:"attribute"`
+	Type      string `json:"type"`
 }
 
 type ReadData struct {
-	Request 	*ReadRequest	`json:"request"`
-	Value 		string         	`json:"value"`
-	Timestamp 	int        		`json:"timestamp"`
-	Status 		int           	`json:"status"`
+	Request   *ReadRequest `json:"request"`
+	Value     string       `json:"value"`
+	Timestamp int          `json:"timestamp"`
+	Status    int          `json:"status"`
 }
 
 func (data *ReadData) Print() {
@@ -62,16 +62,16 @@ type IJolokia interface {
 }
 
 type Jolokia struct {
-	ip			string
-	port		string
-	jolokiaURL  string
+	ip         string
+	port       string
+	jolokiaURL string
 }
 
 func NewJolokia(_ip string, _port string, _path string) *Jolokia {
 
-	j := Jolokia {
-		ip: _ip,
-		port: _port,
+	j := Jolokia{
+		ip:         _ip,
+		port:       _port,
 		jolokiaURL: "http://admin:admin@" + _ip + ":" + _port + _path,
 	}
 
@@ -87,7 +87,7 @@ func (j *Jolokia) Read(_path string) (*ReadData, error) {
 	}
 
 	jolokiaClient := http.Client{
-		Timeout: time.Second *2, // Maximum of 2 seconds
+		Timeout: time.Second * 2, // Maximum of 2 seconds
 	}
 
 	var err error = nil
@@ -99,10 +99,11 @@ func (j *Jolokia) Read(_path string) (*ReadData, error) {
 		req.Header.Set("User-Agent", "activemq-artemis-management")
 
 		res, err := jolokiaClient.Do(req)
-		defer res.Body.Close()
+
 		if err != nil {
 			break
 		}
+		defer res.Body.Close()
 
 		body, err := ioutil.ReadAll(res.Body)
 		if err != nil {
@@ -130,7 +131,7 @@ func (j *Jolokia) Exec(_path string, _postJsonString string) (*ExecData, error) 
 	}
 
 	jolokiaClient := http.Client{
-		Timeout: time.Second *2, // Maximum of 2 seconds
+		Timeout: time.Second * 2, // Maximum of 2 seconds
 	}
 
 	var err error = nil
@@ -143,11 +144,11 @@ func (j *Jolokia) Exec(_path string, _postJsonString string) (*ExecData, error) 
 		req.Header.Set("User-Agent", "activemq-artemis-management")
 		req.Header.Set("Content-Type", "application/json")
 		res, err := jolokiaClient.Do(req)
-		defer res.Body.Close()
+
 		if err != nil {
 			break
 		}
-
+		defer res.Body.Close()
 		body, err := ioutil.ReadAll(res.Body)
 		if err != nil {
 			break
