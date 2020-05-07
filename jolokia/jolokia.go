@@ -55,7 +55,7 @@ func (data *ExecData) Print() {
 }
 
 type IJolokia interface {
-	NewJolokia(_ip string, _port string, _path string) *Jolokia
+	NewJolokia(_ip string, _port string, _path string, _user string, _password string) *Jolokia
 	Read(_path string) (*ReadData, error)
 	Exec(_path string) (*ExecData, error)
 	Print(data *ReadData)
@@ -65,14 +65,25 @@ type Jolokia struct {
 	ip         string
 	port       string
 	jolokiaURL string
+	user       string
+	password   string
 }
 
-func NewJolokia(_ip string, _port string, _path string) *Jolokia {
+func NewJolokia(_ip string, _port string, _path string, _user string, _password string) *Jolokia {
 
 	j := Jolokia{
 		ip:         _ip,
 		port:       _port,
-		jolokiaURL: "http://admin:admin@" + _ip + ":" + _port + _path,
+		jolokiaURL: _ip + ":" + _port + _path,
+		user:       _user,
+		password:   _password,
+
+	}
+	if j.user == "" {
+		j.user = "admin"
+	}
+	if j.password == "" {
+		j.password = "admin"
 	}
 
 	return &j
@@ -80,7 +91,7 @@ func NewJolokia(_ip string, _port string, _path string) *Jolokia {
 
 func (j *Jolokia) Read(_path string) (*ReadData, error) {
 
-	url := j.jolokiaURL + "/read/" + _path
+	url := "http://" + j.user + ":" + j.password + "@" + j.jolokiaURL + "/read/" + _path
 
 	jdata := &ReadData{
 		Request: &ReadRequest{},
@@ -124,7 +135,7 @@ func (j *Jolokia) Read(_path string) (*ReadData, error) {
 
 func (j *Jolokia) Exec(_path string, _postJsonString string) (*ExecData, error) {
 
-	url := j.jolokiaURL + "/exec/" + _path
+	url := "http://" + j.user + ":" + j.password + "@" + j.jolokiaURL + "/exec/" + _path
 
 	jdata := &ExecData{
 		Request: &ExecRequest{},

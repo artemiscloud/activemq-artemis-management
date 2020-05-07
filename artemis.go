@@ -1,12 +1,12 @@
 package artemis
 
 import (
-	"github.com/roddiekieley/activemq-artemis-management/jolokia"
+	"github.com/artemiscloud/activemq-artemis-management/jolokia"
 	"strings"
 )
 
 type IArtemis interface {
-	NewArtemis(_ip string, _jolokiaPort string, _name string) *Artemis
+	NewArtemis(_ip string, _jolokiaPort string, _name string, _userName string, _password string) *Artemis
 	Uptime() (*jolokia.ReadData, error)
 	CreateQueue(addressName string, queueName string) (*jolokia.ExecData, error)
 	DeleteQueue(queueName string) (*jolokia.ExecData, error)
@@ -18,16 +18,18 @@ type Artemis struct {
 	ip          string
 	jolokiaPort string
 	name        string
+	userName    string
+	password    string
 	jolokia     *jolokia.Jolokia
 }
 
-func NewArtemis(_ip string, _jolokiaPort string, _name string) *Artemis {
+func NewArtemis(_ip string, _jolokiaPort string, _name string, _user string, _password string) *Artemis {
 
 	artemis := Artemis{
 		ip:          _ip,
 		jolokiaPort: _jolokiaPort,
 		name:        _name,
-		jolokia:     jolokia.NewJolokia(_ip, _jolokiaPort, "/console/jolokia"),
+		jolokia:     jolokia.NewJolokia(_ip, _jolokiaPort, "/console/jolokia", _user, _password),
 	}
 
 	return &artemis
