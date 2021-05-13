@@ -5,7 +5,6 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"net/http"
 	"time"
 )
@@ -21,11 +20,36 @@ type ExecRequest struct {
 	Operation string   `json:"operation"`
 }
 
+type ResponseData interface {
+	GetStatusCode() int
+	GetValue() string
+	GetErrorType() string
+	GetError() string
+}
+
 type ExecData struct {
 	Request   *ExecRequest `json:"request"`
 	Value     string       `json:"value"`
 	Timestamp int          `json:"timestamp"`
+	ErrorType string       `json:"error_type"`
+	Error     string       `json:"error"`
 	Status    int          `json:"status"`
+}
+
+func (e *ExecData) GetStatusCode() int {
+	return e.Status
+}
+
+func (e *ExecData) GetValue() string {
+	return e.Value
+}
+
+func (e *ExecData) GetErrorType() string {
+	return e.ErrorType
+}
+
+func (e *ExecData) GetError() string {
+	return e.Error
 }
 
 type ReadRequest struct {
@@ -38,7 +62,34 @@ type ReadData struct {
 	Request   *ReadRequest `json:"request"`
 	Value     string       `json:"value"`
 	Timestamp int          `json:"timestamp"`
+	ErrorType string       `json:"error_type"`
+	Error     string       `json:"error"`
 	Status    int          `json:"status"`
+}
+
+func (r *ReadData) GetStatusCode() int {
+	return r.Status
+}
+
+func (r *ReadData) GetValue() string {
+	return r.Value
+}
+
+func (r *ReadData) GetErrorType() string {
+	return r.ErrorType
+}
+
+func (r *ReadData) GetError() string {
+	return r.Error
+}
+
+type JolokiaError struct {
+	HttpCode int
+	Message  string
+}
+
+func (j *JolokiaError) Error() string {
+	return fmt.Sprintf("HTTP STATUS %v. Message: %v", j.HttpCode, j.Message)
 }
 
 func (data *ReadData) Print() {
@@ -136,16 +187,8 @@ func (j *Jolokia) Read(_path string) (*ReadData, error) {
 		}
 		defer res.Body.Close()
 
-		body, err := ioutil.ReadAll(res.Body)
-		if err != nil {
-			break
-		}
-
-		bodyString := string(body)
-		err = json.Unmarshal([]byte(bodyString), jdata)
-		if err != nil {
-			break
-		}
+		//before decoding the body, we need to check the http code
+		err = CheckResponse(res, jdata)
 
 		break
 	}
@@ -163,10 +206,11 @@ func (j *Jolokia) Exec(_path string, _postJsonString string) (*ExecData, error) 
 
 	jolokiaClient := j.getClient()
 
-	var err error = nil
+	var execErr error = nil
 	for {
 		req, err := http.NewRequest(http.MethodPost, url, bytes.NewBuffer([]byte(_postJsonString)))
 		if err != nil {
+			execErr = err
 			break
 		}
 
@@ -175,22 +219,41 @@ func (j *Jolokia) Exec(_path string, _postJsonString string) (*ExecData, error) 
 		res, err := jolokiaClient.Do(req)
 
 		if err != nil {
-			break
-		}
-		defer res.Body.Close()
-		body, err := ioutil.ReadAll(res.Body)
-		if err != nil {
+			execErr = err
 			break
 		}
 
-		bodyString := string(body)
-		err = json.Unmarshal([]byte(bodyString), jdata)
+		defer res.Body.Close()
+
+		//before decoding the body, we need to check the http code
+		err = CheckResponse(res, jdata)
 		if err != nil {
-			break
+			execErr = err
 		}
 
 		break
 	}
 
-	return jdata, err
+	return jdata, execErr
+}
+
+func CheckResponse(resp *http.Response, jdata ResponseData) error {
+
+	if isResponseSuccessful(resp.StatusCode) {
+		//that doesn't mean it's ok, check further
+		if err := json.NewDecoder(resp.Body).Decode(jdata); err != nil {
+			return err
+		}
+		if isResponseSuccessful(jdata.GetStatusCode()) {
+			return nil
+		}
+	}
+	return &JolokiaError{
+		HttpCode: jdata.GetStatusCode(),
+		Message:  " Error: " + jdata.GetError(),
+	}
+}
+
+func isResponseSuccessful(httpCode int) bool {
+	return httpCode >= 200 && httpCode <= 299
 }
