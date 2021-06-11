@@ -59,6 +59,17 @@ func (artemis *Artemis) CreateQueue(addressName string, queueName string, routin
 	return data, err
 }
 
+func (artemis *Artemis) CreateAddress(addressName string, routingType string) (*jolokia.ExecData, error) {
+
+	url := "org.apache.activemq.artemis:broker=\\\"" + artemis.name + "\\\""
+	routingType = strings.ToUpper(routingType)
+	parameters := `"` + addressName + `","` + routingType + `"`
+	jsonStr := `{ "type":"EXEC","mbean":"` + url + `","operation":"createAddress(java.lang.String,java.lang.String)","arguments":[` + parameters + `]` + ` }`
+	data, err := artemis.jolokia.Exec(url, jsonStr)
+
+	return data, err
+}
+
 func (artemis *Artemis) DeleteQueue(queueName string) (*jolokia.ExecData, error) {
 
 	url := "org.apache.activemq.artemis:broker=\\\"" + artemis.name + "\\\""
