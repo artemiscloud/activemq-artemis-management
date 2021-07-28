@@ -59,6 +59,21 @@ func (artemis *Artemis) CreateQueue(addressName string, queueName string, routin
 	return data, err
 }
 
+func (artemis *Artemis) CreateQueueFromConfig(queueConfig string, ignoreIfExists bool) (*jolokia.ExecData, error) {
+	var ignoreIfExistsValue string
+	if ignoreIfExists {
+		ignoreIfExistsValue = "true"
+	} else {
+		ignoreIfExistsValue = "false"
+	}
+	url := "org.apache.activemq.artemis:broker=\\\"" + artemis.name + "\\\""
+	parameters := `"` + queueConfig + `","` + ignoreIfExistsValue + `"`
+	jsonStr := `{ "type":"EXEC","mbean":"` + url + `","operation":"createQueue(java.lang.String,java.lang.Boolean)","arguments":[` + parameters + `]` + ` }`
+	data, err := artemis.jolokia.Exec(url, jsonStr)
+
+	return data, err
+}
+
 func (artemis *Artemis) CreateAddress(addressName string, routingType string) (*jolokia.ExecData, error) {
 
 	url := "org.apache.activemq.artemis:broker=\\\"" + artemis.name + "\\\""
