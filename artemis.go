@@ -67,8 +67,9 @@ func (artemis *Artemis) CreateQueueFromConfig(queueConfig string, ignoreIfExists
 		ignoreIfExistsValue = "false"
 	}
 	url := "org.apache.activemq.artemis:broker=\\\"" + artemis.name + "\\\""
-	parameters := `"` + queueConfig + `","` + ignoreIfExistsValue + `"`
-	jsonStr := `{ "type":"EXEC","mbean":"` + url + `","operation":"createQueue(java.lang.String,java.lang.Boolean)","arguments":[` + parameters + `]` + ` }`
+	parameters := queueConfig + `,` + ignoreIfExistsValue
+	jsonStr := `{ "type":"EXEC","mbean":"` + url + `","operation":"createQueue(java.lang.String,boolean)","arguments":[` + parameters + `]` + ` }`
+
 	data, err := artemis.jolokia.Exec(url, jsonStr)
 
 	return data, err

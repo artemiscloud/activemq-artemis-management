@@ -3,7 +3,6 @@ package jolokia
 import (
 	"bytes"
 	"crypto/tls"
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"time"
@@ -241,12 +240,15 @@ func CheckResponse(resp *http.Response, jdata ResponseData) error {
 
 	if isResponseSuccessful(resp.StatusCode) {
 		//that doesn't mean it's ok, check further
-		if err := json.NewDecoder(resp.Body).Decode(jdata); err != nil {
-			return err
-		}
-		if isResponseSuccessful(jdata.GetStatusCode()) {
+		if jdata.GetStatusCode() == 0 {
 			return nil
 		}
+		errCode := jdata.GetStatusCode()
+		errType := jdata.GetErrorType()
+		errMsg := jdata.GetError()
+		errData := jdata.GetValue()
+		internalErr := fmt.Errorf("Error response code %v, type %v, message %v and data %v", errCode, errType, errMsg, errData)
+		return internalErr
 	}
 	return &JolokiaError{
 		HttpCode: jdata.GetStatusCode(),
