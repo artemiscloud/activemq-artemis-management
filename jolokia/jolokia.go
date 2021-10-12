@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"fmt"
 	"net/http"
+	"net/url"
 	"time"
 )
 
@@ -140,6 +141,9 @@ func GetJolokia(_ip string, _port string, _path string, _user string, _password 
 	}
 	if j.password == "" {
 		j.password = "admin"
+	} else {
+		//encode password in case it has special chars
+		j.password = url.QueryEscape(j.password)
 	}
 
 	return &j
