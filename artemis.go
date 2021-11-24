@@ -6,13 +6,27 @@ import (
 	"github.com/artemiscloud/activemq-artemis-management/jolokia"
 )
 
+const (
+	QUEUE_ALREADY_EXISTS = "AMQ229019"
+	UNKNOWN_ERROR        = "AMQ_UNKNOWN"
+)
+
+func GetCreationError(jdata *jolokia.ResponseData) string {
+	if strings.Contains(jdata.Error, QUEUE_ALREADY_EXISTS) {
+		return QUEUE_ALREADY_EXISTS
+	}
+	return UNKNOWN_ERROR
+}
+
 type IArtemis interface {
 	NewArtemis(_ip string, _jolokiaPort string, _name string, _userName string, _password string) *Artemis
-	Uptime() (*jolokia.ReadData, error)
-	CreateQueue(addressName string, queueName string) (*jolokia.ExecData, error)
-	DeleteQueue(queueName string) (*jolokia.ExecData, error)
-	ListBindingsForAddress(addressName string) (*jolokia.ExecData, error)
-	DeleteAddress(addressName string) (*jolokia.ExecData, error)
+	Uptime() (*jolokia.ResponseData, error)
+	CreateQueue(addressName string, queueName string) (*jolokia.ResponseData, error)
+	DeleteQueue(queueName string) (*jolokia.ResponseData, error)
+	ListBindingsForAddress(addressName string) (*jolokia.ResponseData, error)
+	DeleteAddress(addressName string) (*jolokia.ResponseData, error)
+	CreateQueueFromConfig(queueConfig string, ignoreIfExists bool) (jolokia.ResponseData, error)
+	UpdateQueue(queueConfig string) (jolokia.ResponseData, error)
 }
 
 type Artemis struct {
@@ -40,7 +54,7 @@ func GetArtemis(_ip string, _jolokiaPort string, _name string, _user string, _pa
 	return &artemis
 }
 
-func (artemis *Artemis) Uptime() (*jolokia.ReadData, error) {
+func (artemis *Artemis) Uptime() (*jolokia.ResponseData, error) {
 
 	uptimeURL := "org.apache.activemq.artemis:broker=\"" + artemis.name + "\"/Uptime"
 	data, err := artemis.jolokia.Read(uptimeURL)
@@ -48,7 +62,7 @@ func (artemis *Artemis) Uptime() (*jolokia.ReadData, error) {
 	return data, err
 }
 
-func (artemis *Artemis) CreateQueue(addressName string, queueName string, routingType string) (*jolokia.ExecData, error) {
+func (artemis *Artemis) CreateQueue(addressName string, queueName string, routingType string) (*jolokia.ResponseData, error) {
 
 	url := "org.apache.activemq.artemis:broker=\\\"" + artemis.name + "\\\""
 	routingType = strings.ToUpper(routingType)
@@ -59,7 +73,18 @@ func (artemis *Artemis) CreateQueue(addressName string, queueName string, routin
 	return data, err
 }
 
-func (artemis *Artemis) CreateQueueFromConfig(queueConfig string, ignoreIfExists bool) (*jolokia.ExecData, error) {
+func (artemis *Artemis) UpdateQueue(queueConfig string) (*jolokia.ResponseData, error) {
+	url := "org.apache.activemq.artemis:broker=\\\"" + artemis.name + "\\\""
+	parameters := queueConfig
+	jsonStr := `{ "type":"EXEC","mbean":"` + url + `","operation":"updateQueue(java.lang.String)","arguments":[` + parameters + `]` + ` }`
+
+	data, err := artemis.jolokia.Exec(url, jsonStr)
+
+	return data, err
+
+}
+
+func (artemis *Artemis) CreateQueueFromConfig(queueConfig string, ignoreIfExists bool) (*jolokia.ResponseData, error) {
 	var ignoreIfExistsValue string
 	if ignoreIfExists {
 		ignoreIfExistsValue = "true"
@@ -75,7 +100,7 @@ func (artemis *Artemis) CreateQueueFromConfig(queueConfig string, ignoreIfExists
 	return data, err
 }
 
-func (artemis *Artemis) CreateAddress(addressName string, routingType string) (*jolokia.ExecData, error) {
+func (artemis *Artemis) CreateAddress(addressName string, routingType string) (*jolokia.ResponseData, error) {
 
 	url := "org.apache.activemq.artemis:broker=\\\"" + artemis.name + "\\\""
 	routingType = strings.ToUpper(routingType)
@@ -86,7 +111,7 @@ func (artemis *Artemis) CreateAddress(addressName string, routingType string) (*
 	return data, err
 }
 
-func (artemis *Artemis) DeleteQueue(queueName string) (*jolokia.ExecData, error) {
+func (artemis *Artemis) DeleteQueue(queueName string) (*jolokia.ResponseData, error) {
 
 	url := "org.apache.activemq.artemis:broker=\\\"" + artemis.name + "\\\""
 	parameters := `"` + queueName + `"`
@@ -96,7 +121,7 @@ func (artemis *Artemis) DeleteQueue(queueName string) (*jolokia.ExecData, error)
 	return data, err
 }
 
-func (artemis *Artemis) ListBindingsForAddress(addressName string) (*jolokia.ExecData, error) {
+func (artemis *Artemis) ListBindingsForAddress(addressName string) (*jolokia.ResponseData, error) {
 
 	url := "org.apache.activemq.artemis:broker=\\\"" + artemis.name + "\\\""
 	parameters := `"` + addressName + `"`
@@ -106,7 +131,7 @@ func (artemis *Artemis) ListBindingsForAddress(addressName string) (*jolokia.Exe
 	return data, err
 }
 
-func (artemis *Artemis) DeleteAddress(addressName string) (*jolokia.ExecData, error) {
+func (artemis *Artemis) DeleteAddress(addressName string) (*jolokia.ResponseData, error) {
 
 	url := "org.apache.activemq.artemis:broker=\\\"" + artemis.name + "\\\""
 	parameters := `"` + addressName + `"`

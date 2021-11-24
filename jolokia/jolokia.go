@@ -3,6 +3,7 @@ package jolokia
 import (
 	"bytes"
 	"crypto/tls"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -13,74 +14,17 @@ type IData interface {
 	Print()
 }
 
-type ExecRequest struct {
-	MBean     string   `json:"mbean"`
-	Arguments []string `json:"arguments"`
-	Type      string   `json:"type"`
-	Operation string   `json:"operation"`
-}
-
-type ResponseData interface {
-	GetStatusCode() int
-	GetValue() string
-	GetErrorType() string
-	GetError() string
-}
-
-type ExecData struct {
-	Request   *ExecRequest `json:"request"`
-	Value     string       `json:"value"`
-	Timestamp int          `json:"timestamp"`
-	ErrorType string       `json:"error_type"`
-	Error     string       `json:"error"`
-	Status    int          `json:"status"`
-}
-
-func (e *ExecData) GetStatusCode() int {
-	return e.Status
-}
-
-func (e *ExecData) GetValue() string {
-	return e.Value
-}
-
-func (e *ExecData) GetErrorType() string {
-	return e.ErrorType
-}
-
-func (e *ExecData) GetError() string {
-	return e.Error
+type ResponseData struct {
+	Status    int
+	Value     string
+	ErrorType string
+	Error     string
 }
 
 type ReadRequest struct {
 	MBean     string `json:"mbean"`
 	Attribute string `json:"attribute"`
 	Type      string `json:"type"`
-}
-
-type ReadData struct {
-	Request   *ReadRequest `json:"request"`
-	Value     string       `json:"value"`
-	Timestamp int          `json:"timestamp"`
-	ErrorType string       `json:"error_type"`
-	Error     string       `json:"error"`
-	Status    int          `json:"status"`
-}
-
-func (r *ReadData) GetStatusCode() int {
-	return r.Status
-}
-
-func (r *ReadData) GetValue() string {
-	return r.Value
-}
-
-func (r *ReadData) GetErrorType() string {
-	return r.ErrorType
-}
-
-func (r *ReadData) GetError() string {
-	return r.Error
 }
 
 type JolokiaError struct {
@@ -92,25 +36,10 @@ func (j *JolokiaError) Error() string {
 	return fmt.Sprintf("HTTP STATUS %v. Message: %v", j.HttpCode, j.Message)
 }
 
-func (data *ReadData) Print() {
-	fmt.Println(data.Request)
-	fmt.Println(data.Value)
-	fmt.Println(data.Timestamp)
-	fmt.Println(data.Status)
-}
-
-func (data *ExecData) Print() {
-	fmt.Println(data.Request)
-	fmt.Println(data.Value)
-	fmt.Println(data.Timestamp)
-	fmt.Println(data.Status)
-}
-
 type IJolokia interface {
 	NewJolokia(_ip string, _port string, _path string, _user string, _password string) *Jolokia
-	Read(_path string) (*ReadData, error)
-	Exec(_path string) (*ExecData, error)
-	Print(data *ReadData)
+	Read(_path string) (*ResponseData, error)
+	Exec(_path string) (*ResponseData, error)
 }
 
 type Jolokia struct {
@@ -165,17 +94,15 @@ func (j *Jolokia) getClient() *http.Client {
 	}
 }
 
-func (j *Jolokia) Read(_path string) (*ReadData, error) {
+func (j *Jolokia) Read(_path string) (*ResponseData, error) {
 
 	url := j.protocol + "://" + j.user + ":" + j.password + "@" + j.jolokiaURL + "/read/" + _path
-
-	jdata := &ReadData{
-		Request: &ReadRequest{},
-	}
 
 	jolokiaClient := j.getClient()
 
 	var err error = nil
+	var jdata *ResponseData = nil
+
 	for {
 		req, err := http.NewRequest(http.MethodGet, url, nil)
 		if err != nil {
@@ -190,8 +117,16 @@ func (j *Jolokia) Read(_path string) (*ReadData, error) {
 		}
 		defer res.Body.Close()
 
+		//decoding
+		result, _, err := decodeResponseData(res)
+		if err != nil {
+			return result, err
+		}
+
+		jdata = result
+
 		//before decoding the body, we need to check the http code
-		err = CheckResponse(res, jdata)
+		err = CheckResponse(res, result)
 
 		break
 	}
@@ -199,16 +134,13 @@ func (j *Jolokia) Read(_path string) (*ReadData, error) {
 	return jdata, err
 }
 
-func (j *Jolokia) Exec(_path string, _postJsonString string) (*ExecData, error) {
+func (j *Jolokia) Exec(_path string, _postJsonString string) (*ResponseData, error) {
 
 	url := j.protocol + "://" + j.user + ":" + j.password + "@" + j.jolokiaURL + "/exec/" + _path
 
-	jdata := &ExecData{
-		Request: &ExecRequest{},
-	}
-
 	jolokiaClient := j.getClient()
 
+	var jdata *ResponseData
 	var execErr error = nil
 	for {
 		req, err := http.NewRequest(http.MethodPost, url, bytes.NewBuffer([]byte(_postJsonString)))
@@ -228,8 +160,15 @@ func (j *Jolokia) Exec(_path string, _postJsonString string) (*ExecData, error) 
 
 		defer res.Body.Close()
 
-		//before decoding the body, we need to check the http code
-		err = CheckResponse(res, jdata)
+		//decoding
+		result, _, err := decodeResponseData(res)
+		if err != nil {
+			return result, err
+		}
+
+		jdata = result
+
+		err = CheckResponse(res, result)
 		if err != nil {
 			execErr = err
 		}
@@ -240,26 +179,59 @@ func (j *Jolokia) Exec(_path string, _postJsonString string) (*ExecData, error) 
 	return jdata, execErr
 }
 
-func CheckResponse(resp *http.Response, jdata ResponseData) error {
+func CheckResponse(resp *http.Response, jdata *ResponseData) error {
 
 	if isResponseSuccessful(resp.StatusCode) {
 		//that doesn't mean it's ok, check further
-		if jdata.GetStatusCode() == 0 {
+		if isResponseSuccessful(jdata.Status) {
 			return nil
 		}
-		errCode := jdata.GetStatusCode()
-		errType := jdata.GetErrorType()
-		errMsg := jdata.GetError()
-		errData := jdata.GetValue()
+		errCode := jdata.Status
+		errType := jdata.ErrorType
+		errMsg := jdata.Error
+		errData := jdata.Value
 		internalErr := fmt.Errorf("Error response code %v, type %v, message %v and data %v", errCode, errType, errMsg, errData)
 		return internalErr
 	}
 	return &JolokiaError{
-		HttpCode: jdata.GetStatusCode(),
-		Message:  " Error: " + jdata.GetError(),
+		HttpCode: resp.StatusCode,
+		Message:  " Error: " + resp.Status,
 	}
 }
 
 func isResponseSuccessful(httpCode int) bool {
 	return httpCode >= 200 && httpCode <= 299
+}
+
+func decodeResponseData(resp *http.Response) (*ResponseData, map[string]interface{}, error) {
+	result := &ResponseData{}
+	rawData := make(map[string]interface{})
+	if err := json.NewDecoder(resp.Body).Decode(&rawData); err != nil {
+		return nil, rawData, err
+	}
+
+	//fill in response data
+	if v, ok := rawData["error"]; ok {
+		if v != nil {
+			result.Error = v.(string)
+		}
+	}
+	if v, ok := rawData["error_type"]; ok {
+		if v != nil {
+			result.ErrorType = v.(string)
+		}
+	}
+	if v, ok := rawData["status"]; ok {
+		if v != nil {
+			result.Status = int(v.(float64))
+		}
+	}
+	if v, ok := rawData["value"]; ok {
+		if v != nil {
+			result.Value = v.(string)
+		}
+	}
+
+	return result, rawData, nil
+
 }
