@@ -12,6 +12,9 @@ const (
 )
 
 func GetCreationError(jdata *jolokia.ResponseData) string {
+	if jdata == nil {
+		return UNKNOWN_ERROR
+	}
 	if strings.Contains(jdata.Error, QUEUE_ALREADY_EXISTS) {
 		return QUEUE_ALREADY_EXISTS
 	}
