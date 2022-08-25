@@ -20,7 +20,7 @@ func GetCreationError(jdata *jolokia.ResponseData) string {
 		return QUEUE_ALREADY_EXISTS
 	}
 	if strings.Contains(jdata.Error, ADDRESS_ALREADY_EXISTS) {
-		return QUEUE_ALREADY_EXISTS
+		return ADDRESS_ALREADY_EXISTS
 	}
 	return UNKNOWN_ERROR
 }
