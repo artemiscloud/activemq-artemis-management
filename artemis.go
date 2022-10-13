@@ -42,7 +42,7 @@ type Artemis struct {
 	name        string
 	userName    string
 	password    string
-	jolokia     *jolokia.Jolokia
+	jolokia     jolokia.IJolokia
 }
 
 func NewArtemis(_ip string, _jolokiaPort string, _name string, _user string, _password string) *Artemis {
@@ -67,6 +67,15 @@ func (artemis *Artemis) Uptime() (*jolokia.ResponseData, error) {
 	data, err := artemis.jolokia.Read(uptimeURL)
 
 	return data, err
+}
+
+func (artemis *Artemis) GetStatus() (string, error) {
+	url := "org.apache.activemq.artemis:broker=\\\"" + artemis.name + "\\\"/Status"
+	resp, err := artemis.jolokia.Read(url)
+	if err != nil {
+		return "", err
+	}
+	return resp.Value, nil
 }
 
 func (artemis *Artemis) CreateQueue(addressName string, queueName string, routingType string) (*jolokia.ResponseData, error) {

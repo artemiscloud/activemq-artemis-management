@@ -37,9 +37,8 @@ func (j *JolokiaError) Error() string {
 }
 
 type IJolokia interface {
-	NewJolokia(_ip string, _port string, _path string, _user string, _password string) *Jolokia
-	Read(_path string) (*ResponseData, error)
-	Exec(_path string) (*ResponseData, error)
+	Read(path string) (*ResponseData, error)
+	Exec(path, postJsonString string) (*ResponseData, error)
 }
 
 type Jolokia struct {
