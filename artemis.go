@@ -1,6 +1,7 @@
 package artemis
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/artemiscloud/activemq-artemis-management/jolokia"
@@ -70,10 +71,13 @@ func (artemis *Artemis) Uptime() (*jolokia.ResponseData, error) {
 }
 
 func (artemis *Artemis) GetStatus() (string, error) {
-	url := "org.apache.activemq.artemis:broker=\\\"" + artemis.name + "\\\"/Status"
+	url := "org.apache.activemq.artemis:broker=\"" + artemis.name + "\"/Status"
 	resp, err := artemis.jolokia.Read(url)
-	if err != nil {
+	if err != nil || resp == nil {
 		return "", err
+	}
+	if resp.Status != 200 {
+		return "", fmt.Errorf("unable to retrieve status %v", resp.Error)
 	}
 	return resp.Value, nil
 }
