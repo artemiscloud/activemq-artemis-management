@@ -21,7 +21,7 @@ func TestGetStatus(t *testing.T) {
 	expectedStatus := "{\"properties\":{\"a_status.properties\": { \"cr:alder32\": \"3d8706a6\"}}}"
 	j.
 		EXPECT().
-		Read(gomock.Eq("org.apache.activemq.artemis:broker=\\\"someBroker\\\"/Status")).
+		Read(gomock.Eq("org.apache.activemq.artemis:broker=\"someBroker\"/Status")).
 		DoAndReturn(func(_ string) (*jolokia.ResponseData, error) {
 			return &jolokia.ResponseData{
 				Status:    200,
@@ -47,7 +47,7 @@ func TestGetStatusWithError(t *testing.T) {
 
 	j.
 		EXPECT().
-		Read(gomock.Eq("org.apache.activemq.artemis:broker=\\\"someBroker\\\"/Status")).
+		Read(gomock.Eq("org.apache.activemq.artemis:broker=\"someBroker\"/Status")).
 		DoAndReturn(func(_ string) (*jolokia.ResponseData, error) {
 			return &jolokia.ResponseData{
 				Status:    404,
@@ -61,6 +61,53 @@ func TestGetStatusWithError(t *testing.T) {
 
 	assert.Empty(t, data)
 	assert.Error(t, err)
+}
+
+func TestGetStatusWithErrorStatusOnly(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	j := mock_jolokia.NewMockIJolokia(ctrl)
+
+	artemis := createMockArtemis(j)
+
+	j.
+		EXPECT().
+		Read(gomock.Eq("org.apache.activemq.artemis:broker=\"someBroker\"/Status")).
+		DoAndReturn(func(_ string) (*jolokia.ResponseData, error) {
+			return &jolokia.ResponseData{
+				Status:    404,
+				Value:     "",
+				ErrorType: "javax.management.AttributeNotFoundException",
+				Error:     "javax.management.AttributeNotFoundException : No such attribute: Status",
+			}, nil
+		}).
+		AnyTimes()
+	data, err := artemis.GetStatus()
+
+	assert.Empty(t, data)
+	assert.Error(t, err)
+}
+
+func TestGetStatusWithNilStatus(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	j := mock_jolokia.NewMockIJolokia(ctrl)
+
+	artemis := createMockArtemis(j)
+
+	j.
+		EXPECT().
+		Read(gomock.Eq("org.apache.activemq.artemis:broker=\"someBroker\"/Status")).
+		DoAndReturn(func(_ string) (*jolokia.ResponseData, error) {
+			return nil, nil
+		}).
+		AnyTimes()
+	data, err := artemis.GetStatus()
+
+	assert.Empty(t, data)
+	assert.Nil(t, err)
 }
 
 func createMockArtemis(j jolokia.IJolokia) Artemis {
