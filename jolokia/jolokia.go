@@ -3,6 +3,7 @@ package jolokia
 import (
 	"bytes"
 	"crypto/tls"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -45,35 +46,45 @@ type Jolokia struct {
 	ip         string
 	port       string
 	jolokiaURL string
-	user       string
-	password   string
+	auth       Auth
 	protocol   string
 }
 
-func NewJolokia(_ip string, _port string, _path string, _user string, _password string) *Jolokia {
-	return GetJolokia(_ip, _port, _path, _user, _password, "http")
+type Auth interface {
+	GetAuth() string
 }
 
-func GetJolokia(_ip string, _port string, _path string, _user string, _password string, _protocol string) *Jolokia {
+type BasicAuth struct {
+	User     string
+	Password string
+}
+
+type TokenAuth struct {
+	Token string
+}
+
+func (b *BasicAuth) GetAuth() string {
+	creds := b.User + ":" + url.QueryEscape(b.Password)
+	return "Basic " + base64.StdEncoding.EncodeToString([]byte(creds))
+}
+
+func (t *TokenAuth) GetAuth() string {
+	return "Bearer " + url.QueryEscape(t.Token)
+}
+
+func NewJolokia(ip string, port string, path string, auth Auth) *Jolokia {
+	return GetJolokia(ip, port, path, auth, "http")
+}
+
+func GetJolokia(ip string, port string, path string, auth Auth, protocol string) *Jolokia {
 
 	j := Jolokia{
-		ip:         _ip,
-		port:       _port,
-		jolokiaURL: _ip + ":" + _port + _path,
-		user:       _user,
-		password:   _password,
-		protocol:   _protocol,
+		ip:         ip,
+		port:       port,
+		jolokiaURL: ip + ":" + port + path,
+		auth:       auth,
+		protocol:   protocol,
 	}
-	if j.user == "" {
-		j.user = "admin"
-	}
-	if j.password == "" {
-		j.password = "admin"
-	} else {
-		//encode password in case it has special chars
-		j.password = url.QueryEscape(j.password)
-	}
-
 	return &j
 }
 
@@ -93,89 +104,65 @@ func (j *Jolokia) getClient() *http.Client {
 	}
 }
 
-func (j *Jolokia) Read(_path string) (*ResponseData, error) {
+func (j *Jolokia) Read(path string) (*ResponseData, error) {
 
-	url := j.protocol + "://" + j.user + ":" + j.password + "@" + j.jolokiaURL + "/read/" + _path
-
+	url := j.protocol + "://" + j.jolokiaURL + "/read/" + path
 	jolokiaClient := j.getClient()
 
-	var err error = nil
-	var jdata *ResponseData = nil
-
-	for {
-		req, err := http.NewRequest(http.MethodGet, url, nil)
-		if err != nil {
-			break
-		}
-		req.Header.Set("User-Agent", "activemq-artemis-management")
-
-		res, err := jolokiaClient.Do(req)
-
-		if err != nil {
-			break
-		}
-		defer res.Body.Close()
-
-		//decoding
-		result, _, err := decodeResponseData(res)
-		if err != nil {
-			return result, err
-		}
-
-		jdata = result
-
-		//before decoding the body, we need to check the http code
-		err = CheckResponse(res, result)
-
-		break
+	req, err := http.NewRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
 	}
 
-	return jdata, err
+	req.Header.Set("Authorization", j.auth.GetAuth())
+	req.Header.Set("User-Agent", "activemq-artemis-management")
+
+	res, err := jolokiaClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer res.Body.Close()
+
+	//decoding
+	result, _, err := decodeResponseData(res)
+	if err != nil {
+		return result, err
+	}
+
+	//before decoding the body, we need to check the http code
+	err = CheckResponse(res, result)
+	return result, err
 }
 
-func (j *Jolokia) Exec(_path string, _postJsonString string) (*ResponseData, error) {
+func (j *Jolokia) Exec(path string, postJsonString string) (*ResponseData, error) {
 
-	url := j.protocol + "://" + j.user + ":" + j.password + "@" + j.jolokiaURL + "/exec/" + _path
-
+	url := j.protocol + "://" + j.jolokiaURL + "/exec/" + path
 	jolokiaClient := j.getClient()
 
-	var jdata *ResponseData
-	var execErr error = nil
-	for {
-		req, err := http.NewRequest(http.MethodPost, url, bytes.NewBuffer([]byte(_postJsonString)))
-		if err != nil {
-			execErr = err
-			break
-		}
-
-		req.Header.Set("User-Agent", "activemq-artemis-management")
-		req.Header.Set("Content-Type", "application/json")
-		res, err := jolokiaClient.Do(req)
-
-		if err != nil {
-			execErr = err
-			break
-		}
-
-		defer res.Body.Close()
-
-		//decoding
-		result, _, err := decodeResponseData(res)
-		if err != nil {
-			return result, err
-		}
-
-		jdata = result
-
-		err = CheckResponse(res, result)
-		if err != nil {
-			execErr = err
-		}
-
-		break
+	req, err := http.NewRequest(http.MethodPost, url, bytes.NewBuffer([]byte(postJsonString)))
+	if err != nil {
+		return nil, err
 	}
 
-	return jdata, execErr
+	req.Header.Set("Authorization", j.auth.GetAuth())
+	req.Header.Set("User-Agent", "activemq-artemis-management")
+	req.Header.Set("Content-Type", "application/json")
+
+	res, err := jolokiaClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer res.Body.Close()
+
+	//decoding
+	result, _, err := decodeResponseData(res)
+	if err != nil {
+		return result, err
+	}
+
+	//before decoding the body, we need to check the http code
+	err = CheckResponse(res, result)
+	return result, err
 }
 
 func CheckResponse(resp *http.Response, jdata *ResponseData) error {

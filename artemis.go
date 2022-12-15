@@ -41,22 +41,20 @@ type Artemis struct {
 	ip          string
 	jolokiaPort string
 	name        string
-	userName    string
-	password    string
 	jolokia     jolokia.IJolokia
 }
 
-func NewArtemis(_ip string, _jolokiaPort string, _name string, _user string, _password string) *Artemis {
-	return GetArtemis(_ip, _jolokiaPort, _name, _user, _password, "http")
+func NewArtemis(ip string, jolokiaPort string, name string, auth jolokia.Auth) *Artemis {
+	return GetArtemis(ip, jolokiaPort, name, auth, "http")
 }
 
-func GetArtemis(_ip string, _jolokiaPort string, _name string, _user string, _password string, _protocol string) *Artemis {
+func GetArtemis(ip string, jolokiaPort string, name string, auth jolokia.Auth, protocol string) *Artemis {
 
 	artemis := Artemis{
-		ip:          _ip,
-		jolokiaPort: _jolokiaPort,
-		name:        _name,
-		jolokia:     jolokia.GetJolokia(_ip, _jolokiaPort, "/console/jolokia", _user, _password, _protocol),
+		ip:          ip,
+		jolokiaPort: jolokiaPort,
+		name:        name,
+		jolokia:     jolokia.GetJolokia(ip, jolokiaPort, "/console/jolokia", auth, protocol),
 	}
 
 	return &artemis
